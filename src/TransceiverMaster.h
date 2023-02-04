@@ -8,16 +8,18 @@ struct Data
 
 struct Packet
 {
+    unsigned char packet_id;
+    unsigned char group_id;
+    unsigned char policy;
+    unsigned char num_data_fields;
     Data data[7];
-    bool first;
-    char num_data_fields;
 } __attribute__((packed));
 
 struct Packets
 {
-    Data **packets;
+    Packet *packets;
     short num_data_fields;
-} __attribute__((packed));
+};
 
 class Transceiver
 {
@@ -29,17 +31,20 @@ private:
     unsigned long m_last_packet_received;
     unsigned short m_max_packet_wait_time;
     bool m_radio_listening;
-    bool m_reciving;
-    Packet m_packet;
-    short m_number_packets_recived;
-    short m_number_data_fields;
-    short m_number_packets;
+    unsigned char m_received_packet_id;
+    unsigned char m_received_group_id;
+    Packet m_received_packet;
+    short m_received_total_packets;
+    short m_received_number_packets;
+    short m_received_number_data_fields;
     Data *m_pRecived_data;
+    unsigned char m_sent_packet_id;
+    unsigned char m_sent_group_id;
 
 public:
     Transceiver(short ce_pin, short csn_pin, byte address[6]);
     void tick();
-    bool send(Data *data, int size);
+    bool send(Data *data, int size, unsigned char policy);
 
 private:
     void connect();
@@ -54,8 +59,9 @@ private:
     void load_packet();
     void prepare_new_packet();
     void flush_recived_packets();
-    Packets split_payload(Data *data, int size);
+    Packets split_payload(Data *data, int size, unsigned char policy);
     void write_data_to_serial();
+    int boundedIncrement(int number);
 
 public:
 };

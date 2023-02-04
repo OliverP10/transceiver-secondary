@@ -4,6 +4,7 @@
 #include <Arduino.h>
 #include <math.h>
 #include <ArduinoJson.h>
+#include "policy.h"
 
 Transceiver::Transceiver(short ce_pin, short csn_pin, byte address[6]) : m_radio(ce_pin, csn_pin),
                                                                          m_connected(false),
@@ -12,12 +13,15 @@ Transceiver::Transceiver(short ce_pin, short csn_pin, byte address[6]) : m_radio
                                                                          m_last_packet_received(millis()),
                                                                          m_max_packet_wait_time(5),
                                                                          m_radio_listening(false),
-                                                                         m_reciving(false),
-                                                                         m_packet(),
-                                                                         m_number_packets_recived(0),
-                                                                         m_number_data_fields(0),
-                                                                         m_number_packets(0),
-                                                                         m_pRecived_data(nullptr)
+                                                                         m_received_packet_id(0),
+                                                                         m_received_group_id(0),
+                                                                         m_received_packet(),
+                                                                         m_received_total_packets(0),
+                                                                         m_received_number_packets(0),
+                                                                         m_received_number_data_fields(0),
+                                                                         m_pRecived_data(nullptr),
+                                                                         m_sent_packet_id(1),
+                                                                         m_sent_group_id(1)
 
 {
     Serial.begin(9600);
@@ -126,26 +130,25 @@ bool Transceiver::request_to_send(int &num_data_fields)
 }
 
 // Add feature so if the last packet is not recived within time frame it writes the others to serial
+// redo for new id in packet
 void Transceiver::receive()
 {
     this->start_radio_listening();
     if (this->m_radio.available())
     {
-        this->m_radio.read(&this->m_packet, sizeof(this->m_packet));
+        this->m_radio.read(&this->m_received_packet, sizeof(this->m_received_packet));
 
-        if (!this->m_reciving)
+        if (this->m_received_packet_id == this->m_received_packet.packet_id)
+        {
+            return;
+        }
+        if (this->m_received_group_id != this->m_received_packet.group_id)
         { // New packet group
             this->prepare_new_packet();
             this->load_packet();
         }
-        else if (this->m_reciving && !this->m_packet.first)
+        else if (this->m_received_group_id == this->m_received_packet.group_id)
         { // Appeding to packet group
-            this->load_packet();
-        }
-        else if (this->m_reciving && this->m_packet.first)
-        { // flush and start new packet group
-            this->write_data_to_serial();
-            this->prepare_new_packet();
             this->load_packet();
         }
     }
@@ -153,47 +156,49 @@ void Transceiver::receive()
 
 void Transceiver::load_packet()
 {
-    short packet_size = (this->m_number_packets_recived == this->m_number_packets - 1 && this->m_number_data_fields != 7) ? this->m_number_data_fields % 7 : 7;
-    short start = this->m_number_packets_recived * 7;
+    short packet_size = (this->m_received_number_packets == this->m_received_total_packets - 1 && this->m_received_number_data_fields != 7) ? this->m_received_number_data_fields % 7 : 7;
+    short start = this->m_received_number_packets * 7;
     for (short i = 0; i < packet_size; i++)
     {
-        this->m_pRecived_data[start + i] = this->m_packet.data[i];
+        this->m_pRecived_data[start + i] = this->m_received_packet.data[i];
     }
-    this->m_number_packets_recived++;
-    if (this->m_number_packets_recived == this->m_number_packets)
+    this->m_received_number_packets++;
+    if (this->m_received_number_packets == this->m_received_total_packets)
     {
         this->write_data_to_serial();
-        this->m_reciving = false;
     }
 }
 
 void Transceiver::prepare_new_packet()
 {
-    this->m_reciving = true;
-    this->m_number_packets_recived = 0;
-    this->m_number_data_fields = this->m_packet.num_data_fields;
-    this->m_number_packets = ceil(this->m_number_data_fields / 7);
+    if (this->m_received_number_packets < this->m_received_total_packets && this->m_received_packet.policy != Policy::enforce_group)
+    {
+        this->write_data_to_serial();
+    }
+    this->m_received_group_id = this->m_received_packet.group_id;
+    this->m_received_number_packets = 0;
+    this->m_received_number_data_fields = this->m_received_packet.num_data_fields;
+    this->m_received_total_packets = ceil(this->m_received_number_data_fields / 7);
     if (this->m_pRecived_data != nullptr)
     {
         delete[] this->m_pRecived_data;
     }
-    this->m_pRecived_data = new Data[this->m_number_data_fields];
+    this->m_pRecived_data = new Data[this->m_received_number_data_fields];
 }
 
 void Transceiver::flush_recived_packets()
 {
-    if (this->m_reciving && this->m_last_packet_received + this->m_max_packet_wait_time < millis())
+    if (this->m_received_number_packets < this->m_received_total_packets && this->m_received_packet.policy != Policy::enforce_group && this->m_last_packet_received + this->m_max_packet_wait_time < millis())
     {
         this->write_data_to_serial();
-        this->prepare_new_packet();
     };
 }
 
-bool Transceiver::send(Data *data, int size)
+bool Transceiver::send(Data *data, int size, unsigned char policy = Policy::group)
 {
-    this->start_radio_listening();
-    Packets packets = this->split_payload(data, size);
+    Packets packets = this->split_payload(data, size, policy);
 
+    this->stop_radio_listening();
     for (int i = 0; i < packets.num_data_fields; i++)
     {
         bool acknowledged = this->m_radio.write(&packets.packets[i], sizeof(packets.packets[i]), 1);
@@ -201,29 +206,28 @@ bool Transceiver::send(Data *data, int size)
         {
         };
     }
+    delete[] packets.packets;
 }
 
-Packets Transceiver::split_payload(Data *data, int size)
+Packets Transceiver::split_payload(Data *data, int size, unsigned char policy)
 {
     const int max_size = 7;
     int num_packets = ceil(size / max_size);
-    Data **packets = new Data *[num_packets];
+    Packet *packets = new Packet[num_packets];
 
+    unsigned char group_id = this->boundedIncrement(this->m_sent_group_id);
     int index = 0;
     for (int i = 0; i < num_packets; i++)
     {
-        if (i == num_packets - 1 && size != max_size)
-        {
-            packets[i] = new Data[size % max_size];
-        }
-        else
-        {
-            packets[i] = new Data[max_size];
-        }
-
         for (int j = 0; j < max_size && index < size; j++)
         {
-            packets[i][j] = data[index++];
+            Packet packet;
+            packet.packet_id = this->boundedIncrement(this->m_sent_packet_id);
+            packet.group_id = group_id;
+            packet.num_data_fields = size;
+            packet.policy = policy;
+            packet.data[i] = data[index++];
+            packets[i] = packet;
         }
     }
     return {packets, num_packets};
@@ -232,10 +236,20 @@ Packets Transceiver::split_payload(Data *data, int size)
 void Transceiver::write_data_to_serial()
 {
     DynamicJsonDocument doc(sizeof(*this->m_pRecived_data));
-    short last_recived_packet_size = (this->m_number_packets_recived == this->m_number_packets - 1 && this->m_number_data_fields != 7) ? this->m_number_data_fields % 7 : 7;
-    for (short i = 0; i < ((this->m_number_packets_recived - 1) * 7) + last_recived_packet_size; i++)
+    short last_recived_packet_size = (this->m_received_number_packets == this->m_received_total_packets - 1 && this->m_received_number_data_fields != 7) ? this->m_received_number_data_fields % 7 : 7;
+    for (short i = 0; i < ((this->m_received_number_packets - 1) * 7) + last_recived_packet_size; i++)
     {
         doc[this->m_pRecived_data[i].key] = this->m_pRecived_data[i].value;
     }
     serializeJson(doc, Serial);
+}
+
+int Transceiver::boundedIncrement(int number)
+{
+    number++;
+    if (number > 255)
+    {
+        number = 1;
+    }
+    return number;
 }
