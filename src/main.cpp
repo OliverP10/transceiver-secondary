@@ -8,7 +8,7 @@ unsigned long last_run_print = millis();
 unsigned int run_delay_print = 1000;
 
 unsigned long last_run_send = millis();
-unsigned int run_delay_send = 50;
+unsigned int run_delay_send = 1000;
 
 void setup()
 {
@@ -21,18 +21,18 @@ void loop()
   if (last_run_print + run_delay_print < millis())
   {
     last_run_print = millis();
-    // transceiver.debug();
+    transceiver.debug();
   }
 
-  if (last_run_send + run_delay_send < millis())
-  {
-    last_run_send = millis();
-    Data data;
-    data.key = 3;
-    data.value = random(0, 9999);
+  // if (last_run_send + run_delay_send < millis())
+  // {
+  //   last_run_send = millis();
+  //   Data data;
+  //   data.key = 3;
+  //   data.value = random(0, 9999);
 
-    transceiver.send(data);
-  }
+  //   transceiver.load(data);
+  // }
 
   transceiver.tick();
 }
