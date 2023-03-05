@@ -88,8 +88,8 @@ void TransceiverSecondary::debug()
     Serial.println(this->m_buffer->available());
     Serial.print("Connected: ");
     Serial.println(this->m_connected);
-    Serial.print("Awaiting acknoledge: ");
-    Serial.println(this->m_awaiting_acknoledge);
+    // Serial.print("Awaiting acknoledge: ");
+    // Serial.println(this->m_awaiting_acknoledge);
     // Serial.print("Backoff time: ");
     // Serial.println(this->m_backoff_time);
     // Serial.print("Free memory: ");
@@ -130,19 +130,19 @@ void TransceiverSecondary::set_disconnected()
 void TransceiverSecondary::tick()
 {
     this->receive();
-    this->clear_buffer();
     this->monitor_connection_health();
     this->send_data();
+    this->clear_buffer();
 }
 
 void TransceiverSecondary::write_data_to_serial()
 {
-    DynamicJsonDocument doc(sizeof(this->m_received_packet.data));
+    StaticJsonDocument<400> doc;
     for (int i = 0; i < this->m_received_packet.num_data_fields; i++)
     {
         doc[String(this->m_received_packet.data[i].key)] = this->m_received_packet.data[i].value;
     }
-    // serializeJson(doc, Serial);
+    serializeJson(doc, Serial);
 }
 
 void TransceiverSecondary::write_connection_status_to_serial(bool connected)
@@ -194,8 +194,7 @@ Packet TransceiverSecondary::data_to_packet(Data data[7], unsigned char size)
 void TransceiverSecondary::load_large(Data *data, int size)
 {
     const int max_size = 7;
-    int num_packets = ceil(size / max_size);
-
+    int num_packets = ceil((double)size / (double)max_size);
     int index = 0;
     for (int i = 0; i < num_packets; i++)
     {
@@ -207,7 +206,7 @@ void TransceiverSecondary::load_large(Data *data, int size)
             packet_size = j;
         }
 
-        this->load(packet_data, packet_size);
+        this->load(packet_data, packet_size + 1);
     }
 }
 
@@ -272,8 +271,8 @@ void TransceiverSecondary::increase_backoff()
 {
     const int max_backoff = random(950, 1050);
     this->m_backoff_time = min(this->m_backoff_time * (1 + (random(0, 99) / 100.0)), max_backoff);
-    Serial.println("Increasing backoff to: ");
-    Serial.println(this->m_backoff_time);
+    // Serial.println("Increasing backoff to: ");
+    // Serial.println(this->m_backoff_time);
 }
 
 unsigned char TransceiverSecondary::increment_id()
