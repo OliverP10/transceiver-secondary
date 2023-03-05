@@ -46,6 +46,27 @@ void TransceiverSecondary::setup(byte address[6])
     this->m_radio.startListening();
 }
 
+void TransceiverSecondary::receive()
+{
+    if (this->m_radio.available())
+    {
+        this->m_radio.read(&this->m_received_packet, sizeof(this->m_received_packet));
+        if (this->m_last_packet_id != this->m_received_packet.id && this->m_received_packet.num_data_fields != 0)
+        {
+            this->m_last_packet_id = this->m_received_packet.id;
+            if (this->m_received_packet.data->key == 1)
+            {
+                Serial.println("Recived resync");
+                this->m_awaiting_acknoledge = this->m_received_packet.data[0].value;
+                return;
+            }
+            this->write_data_to_serial();
+        }
+        this->m_awaiting_acknoledge = false;
+        this->set_connected();
+    }
+}
+
 void TransceiverSecondary::monitor_connection_health()
 {
     if (this->m_last_health_check + this->m_health_check_delay < millis())
@@ -65,6 +86,8 @@ void TransceiverSecondary::debug()
     packets_lost = 0;
     Serial.print("Buffer available: ");
     Serial.println(this->m_buffer->available());
+    Serial.print("Connected: ");
+    Serial.println(this->m_connected);
     Serial.print("Awaiting acknoledge: ");
     Serial.println(this->m_awaiting_acknoledge);
     // Serial.print("Backoff time: ");
@@ -110,25 +133,6 @@ void TransceiverSecondary::tick()
     this->clear_buffer();
     this->monitor_connection_health();
     this->send_data();
-}
-
-void TransceiverSecondary::receive()
-{
-    if (this->m_radio.available())
-    {
-        this->m_radio.read(&this->m_received_packet, sizeof(this->m_received_packet));
-        if (this->m_last_packet_id != this->m_received_packet.id && this->m_received_packet.num_data_fields != 0)
-        {
-            if (this->m_received_packet.data->key == 1)
-            {
-                this->m_awaiting_acknoledge = this->m_received_packet.data->value;
-            }
-            this->write_data_to_serial();
-            this->m_last_packet_id = this->m_received_packet.id;
-        }
-        this->m_awaiting_acknoledge = false;
-        this->set_connected();
-    }
 }
 
 void TransceiverSecondary::write_data_to_serial()
@@ -203,14 +207,7 @@ void TransceiverSecondary::load_large(Data *data, int size)
             packet_size = j;
         }
 
-        if (this->m_send_packet.num_data_fields == 0)
-        {
-            this->load(packet_data, packet_size);
-        }
-        else
-        {
-            this->add_to_buffer(this->data_to_packet(packet_data, packet_size));
-        };
+        this->load(packet_data, packet_size);
     }
 }
 
@@ -248,7 +245,6 @@ void TransceiverSecondary::add_to_buffer(Packet packet)
     buffered_packet.packet = packet;
     buffered_packet.created_time = millis();
     this->m_buffer->unshift(buffered_packet);
-    this->m_last_backoff = millis();
 }
 
 void TransceiverSecondary::clear_buffer()
