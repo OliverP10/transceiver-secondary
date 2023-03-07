@@ -8,7 +8,7 @@ unsigned long last_run_print = millis();
 unsigned int run_delay_print = 1000;
 
 unsigned long last_run_send = millis();
-unsigned int run_delay_send = 1000;
+unsigned int run_delay_send = 50;
 
 void setup()
 {
@@ -29,7 +29,7 @@ void loop()
     last_run_send = millis();
 
     Data data1;
-    data1.key = 2;
+    data1.key = 1;
     data1.value = random(0, 9999);
 
     Data data2;
@@ -37,23 +37,23 @@ void loop()
     data2.value = random(0, 9999);
 
     Data data3;
-    data3.key = 2;
+    data3.key = 3;
     data3.value = random(0, 9999);
 
     Data data4;
-    data4.key = 2;
+    data4.key = 4;
     data4.value = random(0, 9999);
 
     Data data5;
-    data5.key = 2;
+    data5.key = 5;
     data5.value = random(0, 9999);
 
     Data data6;
-    data6.key = 2;
+    data6.key = 6;
     data6.value = random(0, 9999);
 
     Data data7;
-    data7.key = 2;
+    data7.key = 7;
     data7.value = random(0, 9999);
 
     Data packet_data[7];

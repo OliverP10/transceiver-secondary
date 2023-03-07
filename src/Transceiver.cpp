@@ -40,7 +40,7 @@ void TransceiverSecondary::setup(byte address[6])
     this->m_radio.openWritingPipe(address);
     this->m_radio.enableDynamicAck();
     this->m_radio.setPALevel(RF24_PA_MIN); // RF24_PA_MAX
-    this->m_radio.setDataRate(RF24_2MBPS);
+    this->m_radio.setDataRate(RF24_2MBPS); // RF24_250KBPS
     this->m_radio.setAutoAck(true);
     this->m_radio.setRetries(5, 15);
     this->m_radio.startListening();
@@ -56,7 +56,6 @@ void TransceiverSecondary::receive()
             this->m_last_packet_id = this->m_received_packet.id;
             if (this->m_received_packet.data->key == 1)
             {
-                Serial.println("Recived resync");
                 this->m_awaiting_acknoledge = this->m_received_packet.data[0].value;
                 return;
             }
@@ -137,7 +136,7 @@ void TransceiverSecondary::tick()
 
 void TransceiverSecondary::write_data_to_serial()
 {
-    StaticJsonDocument<400> doc;
+    StaticJsonDocument<100> doc;
     for (int i = 0; i < this->m_received_packet.num_data_fields; i++)
     {
         doc[String(this->m_received_packet.data[i].key)] = this->m_received_packet.data[i].value;
@@ -147,11 +146,14 @@ void TransceiverSecondary::write_data_to_serial()
 
 void TransceiverSecondary::write_connection_status_to_serial(bool connected)
 {
-    StaticJsonDocument<200> doc;
+    StaticJsonDocument<20> doc;
     doc["0"] = (connected) ? 1 : 0;
     serializeJson(doc, Serial);
 }
 
+/*
+    Loads an a single struct of data ready to be sent
+*/
 void TransceiverSecondary::load(Data data)
 {
     Data dataArray[7];
@@ -159,6 +161,9 @@ void TransceiverSecondary::load(Data data)
     return this->load(dataArray, 1);
 }
 
+/*
+    Loads an array of data with max size of 7, ready to be sent
+*/
 void TransceiverSecondary::load(Data data[7], int size)
 {
     Packet packet;
@@ -179,18 +184,9 @@ void TransceiverSecondary::load(Data data[7], int size)
     }
 }
 
-Packet TransceiverSecondary::data_to_packet(Data data[7], unsigned char size)
-{
-    Packet packet;
-    packet.id = this->increment_id();
-    packet.num_data_fields = size;
-    for (unsigned char i = 0; i < size; i++)
-    {
-        packet.data[i] = data[i];
-    }
-    return packet;
-}
-
+/*
+    Loads an array of data with specified size. The data will be split up into max packet size of 7.
+*/
 void TransceiverSecondary::load_large(Data *data, int size)
 {
     const int max_size = 7;
