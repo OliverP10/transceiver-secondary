@@ -6,7 +6,7 @@
 #include <ArduinoJson.h>
 #include <CircularBuffer.h>
 
-// PRIMARY TRANSMITTER
+// Secondary TRANSMITTER
 
 int packets_sent = 0;
 int packets_lost = 0;
@@ -76,17 +76,17 @@ void TransceiverSecondary::monitor_connection_health()
 
 void TransceiverSecondary::debug()
 {
-    Serial.println();
-    Serial.print("Packets sent: ");
-    Serial.println(packets_sent);
-    packets_sent = 0;
-    Serial.print("Packets lost: ");
-    Serial.println(packets_lost);
-    packets_lost = 0;
-    Serial.print("Buffer available: ");
-    Serial.println(this->m_buffer->available());
-    Serial.print("Connected: ");
-    Serial.println(this->m_connected);
+    // Serial.println();
+    // Serial.print("Packets sent: ");
+    // Serial.println(packets_sent);
+    // packets_sent = 0;
+    // Serial.print("Packets lost: ");
+    // Serial.println(packets_lost);
+    // packets_lost = 0;
+    // Serial.print("Buffer available: ");
+    // Serial.println(this->m_buffer->available());
+    // Serial.print("Connected: ");
+    // Serial.println(this->m_connected);
     // Serial.print("Awaiting acknoledge: ");
     // Serial.println(this->m_awaiting_acknoledge);
     // Serial.print("Backoff time: ");
@@ -142,6 +142,7 @@ void TransceiverSecondary::write_data_to_serial()
         doc[String(this->m_received_packet.data[i].key)] = this->m_received_packet.data[i].value;
     }
     serializeJson(doc, Serial);
+    Serial.println();
 }
 
 void TransceiverSecondary::write_connection_status_to_serial(bool connected)
@@ -149,6 +150,7 @@ void TransceiverSecondary::write_connection_status_to_serial(bool connected)
     StaticJsonDocument<20> doc;
     doc["0"] = (connected) ? 1 : 0;
     serializeJson(doc, Serial);
+    Serial.println();
 }
 
 /*

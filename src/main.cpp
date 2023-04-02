@@ -8,11 +8,11 @@ unsigned long last_run_print = millis();
 unsigned int run_delay_print = 1000;
 
 unsigned long last_run_send = millis();
-unsigned int run_delay_send = 50;
+unsigned int run_delay_send = 200;
 
 void setup()
 {
-  Serial.begin(115200);
+  Serial.begin(57600);
   transceiver.setup(address);
 }
 
@@ -34,15 +34,15 @@ void loop()
 
     Data data2;
     data2.key = 2;
-    data2.value = random(0, 9999);
+    data2.value = random(0, 19);
 
     Data data3;
     data3.key = 3;
-    data3.value = random(0, 9999);
+    data3.value = random(0, 21);
 
     Data data4;
     data4.key = 4;
-    data4.value = random(0, 9999);
+    data4.value = random(0, 19);
 
     Data data5;
     data5.key = 5;
@@ -57,15 +57,15 @@ void loop()
     data7.value = random(0, 9999);
 
     Data packet_data[7];
-    packet_data[0] = data1;
-    packet_data[1] = data2;
-    packet_data[2] = data3;
-    packet_data[3] = data4;
-    packet_data[4] = data5;
-    packet_data[5] = data6;
-    packet_data[6] = data7;
+    packet_data[0] = data2;
+    packet_data[1] = data3;
+    packet_data[2] = data4;
+    // packet_data[3] = data1;
+    // packet_data[4] = data5;
+    // packet_data[5] = data6;
+    // packet_data[6] = data7;
 
-    transceiver.load(packet_data, 7);
+    transceiver.load(packet_data, 3);
   }
 
   transceiver.tick();
