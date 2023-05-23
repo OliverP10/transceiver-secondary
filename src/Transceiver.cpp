@@ -10,6 +10,7 @@
 
 int packets_sent = 0;
 int packets_lost = 0;
+int number_backoffs = 0;
 
 TransceiverSecondary::TransceiverSecondary(int ce_pin, int csn_pin) : m_radio(ce_pin, csn_pin),
                                                                       m_connected(false),
@@ -57,6 +58,7 @@ void TransceiverSecondary::receive()
             if (this->m_received_packet.data->key == 1)
             {
                 this->m_awaiting_acknoledge = this->m_received_packet.data[0].value;
+                this->write_data_to_serial();
                 return;
             }
             this->write_data_to_serial();
@@ -82,6 +84,9 @@ void TransceiverSecondary::debug()
     // packets_sent = 0;
     // Serial.print("Packets lost: ");
     // Serial.println(packets_lost);
+    // Serial.print("Number of backoffs: ");
+    // Serial.println(number_backoffs);
+    // number_backoffs = 0;
     // packets_lost = 0;
     // Serial.print("Buffer available: ");
     // Serial.println(this->m_buffer->available());
@@ -128,6 +133,7 @@ void TransceiverSecondary::set_disconnected()
 
 void TransceiverSecondary::tick()
 {
+    this->load_data_from_serial();
     this->receive();
     this->monitor_connection_health();
     this->send_data();
@@ -136,7 +142,7 @@ void TransceiverSecondary::tick()
 
 void TransceiverSecondary::write_data_to_serial()
 {
-    StaticJsonDocument<100> doc;
+    StaticJsonDocument<150> doc;
     for (int i = 0; i < this->m_received_packet.num_data_fields; i++)
     {
         doc[String(this->m_received_packet.data[i].key)] = this->m_received_packet.data[i].value;
@@ -158,15 +164,15 @@ void TransceiverSecondary::write_connection_status_to_serial(bool connected)
 */
 void TransceiverSecondary::load(Data data)
 {
-    Data dataArray[7];
+    Data dataArray[5];
     dataArray[0] = data;
     return this->load(dataArray, 1);
 }
 
 /*
-    Loads an array of data with max size of 7, ready to be sent
+    Loads an array of data with max size of 5, ready to be sent
 */
-void TransceiverSecondary::load(Data data[7], int size)
+void TransceiverSecondary::load(Data data[5], unsigned char size)
 {
     Packet packet;
     packet.id = this->increment_id();
@@ -187,16 +193,16 @@ void TransceiverSecondary::load(Data data[7], int size)
 }
 
 /*
-    Loads an array of data with specified size. The data will be split up into max packet size of 7.
+    Loads an array of data with specified size. The data will be split up into max packet size of 5.
 */
-void TransceiverSecondary::load_large(Data *data, int size)
+void TransceiverSecondary::load_large(Data *data, unsigned char size)
 {
-    const int max_size = 7;
+    const int max_size = 5;
     int num_packets = ceil((double)size / (double)max_size);
     int index = 0;
     for (int i = 0; i < num_packets; i++)
     {
-        Data packet_data[7];
+        Data packet_data[5];
         unsigned char packet_size = 0;
         for (int j = 0; j < max_size && index < size; j++)
         {
@@ -205,6 +211,40 @@ void TransceiverSecondary::load_large(Data *data, int size)
         }
 
         this->load(packet_data, packet_size + 1);
+    }
+}
+
+void TransceiverSecondary::load_data_from_serial()
+{
+    if (Serial.available())
+    {
+        StaticJsonDocument<200> doc;
+        DeserializationError error = deserializeJson(doc, Serial);
+        if (error)
+        {
+            // Serial.println(error.f_str());
+            return;
+        }
+
+        // serializeJson(doc, Serial);
+        // Serial.println();
+
+        Data packet_data[doc.size()];
+        unsigned char index = 0;
+        for (JsonPair kvp : doc.as<JsonObject>())
+        {
+            const char *key = kvp.key().c_str();
+            float value = kvp.value().as<float>();
+
+            Data data;
+            data.key = atoi(key);
+            data.value = value;
+
+            packet_data[index] = data;
+            index++;
+        }
+
+        this->load_large(packet_data, doc.size());
     }
 }
 
@@ -252,7 +292,6 @@ void TransceiverSecondary::clear_buffer()
     }
 
     const unsigned int max_packet_lifetime = 1000;
-
     while (!this->m_buffer->isEmpty() && this->m_buffer->last().created_time + max_packet_lifetime < millis())
     {
         this->m_buffer->pop();
@@ -267,8 +306,9 @@ void TransceiverSecondary::reset_backoff()
 
 void TransceiverSecondary::increase_backoff()
 {
-    const int max_backoff = random(950, 1050);
+    const int max_backoff = random(800, 1100);
     this->m_backoff_time = min(this->m_backoff_time * (1 + (random(0, 99) / 100.0)), max_backoff);
+    number_backoffs++;
     // Serial.println("Increasing backoff to: ");
     // Serial.println(this->m_backoff_time);
 }
