@@ -10,10 +10,10 @@ unsigned int run_delay_print = 1000;
 unsigned long last_run_send = millis();
 unsigned int run_delay_send = 500;
 
-void onDataRecived(Packet packet, int size)
+void onDataRecived(Packet packet)
 {
   Serial.println("Received packet:");
-  for (int i = 0; i < size; i++)
+  for (int i = 0; i < packet.num_data_fields; i++)
   {
     Serial.print(packet.data[i].key);
     Serial.print(": ");

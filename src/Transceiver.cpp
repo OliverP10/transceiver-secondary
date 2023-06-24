@@ -37,7 +37,7 @@ TransceiverSecondary::~TransceiverSecondary()
 /*
 Sets up the radio object with specified pins and address
 */
-void TransceiverSecondary::setup(byte address[6], void (*callback_func)(Packet, int))
+void TransceiverSecondary::setup(byte address[6], void (*callback_func)(Packet))
 {
     this->m_callback_func = callback_func;
     this->m_radio.begin();
@@ -189,7 +189,7 @@ void TransceiverSecondary::call_callback_func()
         return;
     }
     Packet packet = this->m_received_packet;
-    this->m_callback_func(packet, this->m_received_packet.num_data_fields);
+    this->m_callback_func(packet);
 }
 
 /*
