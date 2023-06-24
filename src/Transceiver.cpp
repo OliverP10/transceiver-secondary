@@ -37,8 +37,9 @@ TransceiverSecondary::~TransceiverSecondary()
 /*
 Sets up the radio object with specified pins and address
 */
-void TransceiverSecondary::setup(byte address[6])
+void TransceiverSecondary::setup(byte address[6], void (*callback_func)(Packet, int))
 {
+    this->m_callback_func = callback_func;
     this->m_radio.begin();
     this->m_radio.openReadingPipe(0, address);
     this->m_radio.openWritingPipe(address);
@@ -70,6 +71,7 @@ void TransceiverSecondary::receive()
                 return;
             }
             this->write_data_to_serial();
+            this->call_callback_func();
         }
         this->m_awaiting_acknoledge = false;
         this->set_connected();
@@ -175,6 +177,19 @@ void TransceiverSecondary::write_data_to_serial()
     }
     serializeJson(doc, Serial);
     Serial.println();
+}
+
+/*
+Passes recived data to callback function
+*/
+void TransceiverSecondary::call_callback_func()
+{
+    if (this->m_callback_func == NULL)
+    {
+        return;
+    }
+    Packet packet = this->m_received_packet;
+    this->m_callback_func(packet, this->m_received_packet.num_data_fields);
 }
 
 /*

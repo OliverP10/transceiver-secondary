@@ -10,10 +10,22 @@ unsigned int run_delay_print = 1000;
 unsigned long last_run_send = millis();
 unsigned int run_delay_send = 500;
 
+void onDataRecived(Packet packet, int size)
+{
+  Serial.println("Received packet:");
+  for (int i = 0; i < size; i++)
+  {
+    Serial.print(packet.data[i].key);
+    Serial.print(": ");
+    Serial.println(packet.data[i].value);
+  }
+  Serial.println();
+}
+
 void setup()
 {
   Serial.begin(57600);
-  transceiver.setup(address);
+  transceiver.setup(address, NULL);
 }
 
 void loop()
@@ -76,21 +88,21 @@ void loop()
     data12.key = 31;
     data12.value = random(0, 60);
 
-    Data packet_data[12];
+    Data packet_data[4];
     packet_data[0] = data1;
     packet_data[1] = data2;
     packet_data[2] = data3;
     packet_data[3] = data4;
-    packet_data[4] = data5;
-    packet_data[5] = data6;
-    packet_data[6] = data7;
-    packet_data[7] = data8;
-    packet_data[8] = data9;
-    packet_data[9] = data10;
-    packet_data[10] = data11;
-    packet_data[11] = data12;
+    // packet_data[4] = data5;
+    // packet_data[5] = data6;
+    // packet_data[6] = data7;
+    // packet_data[7] = data8;
+    // packet_data[8] = data9;
+    // packet_data[9] = data10;
+    // packet_data[10] = data11;
+    // packet_data[11] = data12;
 
-    // transceiver.load_large(packet_data, 12);
+    transceiver.load_data(packet_data, 4);
   }
 
   transceiver.tick();
