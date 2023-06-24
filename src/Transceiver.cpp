@@ -68,6 +68,7 @@ void TransceiverSecondary::receive()
             {
                 this->m_awaiting_acknoledge = this->m_received_packet.data[0].value;
                 this->write_data_to_serial();
+                this->write_data_to_callback_func();
                 return;
             }
             this->write_data_to_serial();
